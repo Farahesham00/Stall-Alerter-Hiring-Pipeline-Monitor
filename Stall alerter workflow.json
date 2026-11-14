@@ -1,0 +1,342 @@
+{
+  "name": "Stall alerter",
+  "nodes": [
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 4
+          },
+          "conditions": [
+            {
+              "id": "52cb1d53-163a-4b94-a4b6-9ce6c452f209",
+              "leftValue": "={{ $json.days_since_update }}",
+              "rightValue": 5,
+              "operator": {
+                "type": "number",
+                "operation": "gte"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.4,
+      "position": [
+        656,
+        16
+      ],
+      "id": "25624aa4-9a18-4c4a-b154-9da9c8e466fd",
+      "name": "5 days threshold"
+    },
+    {
+      "parameters": {
+        "jsonSchemaExample": "[\n  {\n    \"candidate\": \"aaa\",\n    \"days_stalled\": 9,\n    \"stage\": \"Offer Sent\",\n    \"priority\": \"High\",\n    \"reason\": \"Offer has no response, risk of losing the candidate\",\n    \"recommended_action\": \"Call the candidate to confirm the offer status\"\n  },\n  {\n    \"candidate\": \"bbb\",\n    \"days_stalled\": 11,\n    \"stage\": \"Technical Interview\",\n    \"priority\": \"High\",\n    \"reason\": \"Waiting too long for technical feedback\",\n    \"recommended_action\": \"Contact the technical interviewer\"\n  },\n  {\n    \"candidate\": \"ccc\",\n    \"days_stalled\": 7,\n    \"stage\": \"Technical Interview\",\n    \"priority\": \"Medium\",\n    \"reason\": \"Feedback pending after interview\",\n    \"recommended_action\": \"Ask the interviewer for feedback and update the candidate\"\n  }\n]"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        1296,
+        240
+      ],
+      "id": "d355ff67-1bed-4b53-bd3b-41e7163370f2",
+      "name": "Structured Output Parser"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1.2,
+      "position": [
+        1088,
+        224
+      ],
+      "id": "3ef77b62-9b39-4c20-9a6b-8e19515c5786",
+      "name": "Google Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": null,
+          "name": "",
+          "__aiGatewayManaged": true
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Candidates info: \n\n{{ $json.data.map((c, i) => `${i + 1}. ${c.Candidate} | Stage: ${c.Stage} | Last Updated: ${c['Last Updated']} | Days since update: ${c.days_since_update}`).join('\\n') }}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "=You are a recruiting coordinator. You receive a list of candidates who are already stalled and all need follow-up. Your job is to rank ALL of them, categorize each by priority, and give a reason and an action.\n\nRules:\n- Return EVERY candidate from the input. Never skip, merge, or drop anyone.\n- Sort the output with the most urgent first.\n- Rank by stage urgency first: Offer Sent > Final Interview > Technical Interview > HR Interview > Applied.\n- Within the same stage, more days stalled means more urgent.\n- Priority categories (all candidates are already stalled, so use these relative levels):\n  - High: Offer Sent, or any candidate stalled 10+ days.\n  - Medium: late-stage candidates (Final / Technical Interview) stalled less than 10 days.\n  - Low: early-stage candidates (HR Interview / Applied) stalled less than 10 days.\n\nCONSISTENCY RULE (very important):\n- Candidates with the SAME stage AND the SAME priority are in the same situation. They MUST get the EXACT SAME \"reason\" and the EXACT SAME \"recommended_action\", word for word.\n- Decide the reason and action once per (stage + priority) group, then copy them unchanged to every candidate in that group.\n- Only use different wording when the stage or the priority is different.\n- Never rephrase, reword, or vary the text inside the same group.\n\nField rules:\n- \"reason\": one short sentence on why this candidate group is at risk.\n- \"recommended_action\": one specific, practical next step (who to contact and for what).\n\nReturn ONLY a JSON array with one object per candidate, no extra text.\nUse exactly this format:\n\n{\n  \"candidate\": \"Ahmed\",\n  \"days_stalled\": 11,\n  \"stage\": \"Technical Interview\",\n  \"priority\": \"High\",\n  \"reason\": \"Waiting too long for technical feedback\",\n  \"recommended_action\": \"Contact the technical interviewer\"\n}"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        1120,
+        16
+      ],
+      "id": "28e79dc2-d536-4bf9-b3fa-716383b76d15",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        912,
+        16
+      ],
+      "id": "00901a94-aa9a-4329-8cd4-870d8856a7eb",
+      "name": "Aggregate"
+    },
+    {
+      "parameters": {
+        "sendTo": "fhesham675@gmail.com",
+        "subject": "={{ $json.subject }}",
+        "message": "={{ $json.html }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1680,
+        16
+      ],
+      "id": "f5a42e7a-5941-4a6a-9b11-7d44b2718ff5",
+      "name": "Send a message",
+      "webhookId": "8c61ae91-984f-4957-a63d-23034b1202ab",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "CgUGaolja7rANoHD",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "weeks"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        0,
+        16
+      ],
+      "id": "512c5e81-be20-4f07-8699-b9e678634747",
+      "name": "Schedule Weekly Trigger"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1jOJHf7X9B41SSyPgEzl34jP2zLzGj5ZpwJgq7cl-2Po",
+          "mode": "list",
+          "cachedResultName": "hiring board",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1jOJHf7X9B41SSyPgEzl34jP2zLzGj5ZpwJgq7cl-2Po/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 161608681,
+          "mode": "list",
+          "cachedResultName": "Stall_alerter",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1jOJHf7X9B41SSyPgEzl34jP2zLzGj5ZpwJgq7cl-2Po/edit#gid=161608681"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        224,
+        16
+      ],
+      "id": "886cfd5a-4f4c-4585-aace-c935af9a2986",
+      "name": "Get hiring board sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "sXfmZqHkhDVfXbB1",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const MS_PER_DAY = 86400000;\nconst now = new Date();\nconst today = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());\n\nreturn $input.all().map(item => {\n  const raw = item.json['Last Updated'];\n  const d = raw ? new Date(raw) : null;\n  const ok = d && !isNaN(d.getTime());\n  const last = ok ? Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) : null;\n\n  return {\n    json: {\n      ...item.json,\n      days_since_update: last === null ? null : Math.floor((today - last) / MS_PER_DAY),\n    },\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        16
+      ],
+      "id": "c5e36f79-2d89-480b-aea5-7758ade457b5",
+      "name": "Calculate Days Since Last Update"
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst result = $input.first().json.output;\n\nconst candidates = typeof result === 'string'\n  ? JSON.parse(result)\n  : result;\n\n// Sort: High first, then Medium, then Low\nconst priorityOrder = {\n  High: 1,\n  Medium: 2,\n  Low: 3\n};\n\ncandidates.sort((a, b) =>\n  (priorityOrder[a.priority] || 4) -\n  (priorityOrder[b.priority] || 4) ||\n  b.days_stalled - a.days_stalled\n);\n\nconst rows = candidates.map(c => `\n  <tr>\n    <td>${c.candidate}</td>\n    <td>${c.stage}</td>\n    <td>${c.days_stalled} days</td>\n    <td><b>${c.priority}</b></td>\n    <td>${c.reason}</td>\n    <td>${c.recommended_action}</td>\n  </tr>\n`).join('');\n\nconst html = `\n<h2>Hiring Pipeline – Stall Alert Report</h2>\n<p>These candidates have been identified as stalled\nin the hiring pipeline and may require follow-up.</p>\n\n<table border=\"1\" cellpadding=\"8\"\n  cellspacing=\"0\" style=\"border-collapse:collapse;\">\n  <tr>\n    <th>Candidate</th>\n    <th>Stage</th>\n    <th>Days Stalled</th>\n    <th>Priority</th>\n    <th>Reason</th>\n    <th>Recommended Action</th>\n  </tr>\n  ${rows}\n</table>\n\n<p><i>Generated automatically by the Stall Alerter.</i></p>\n`;\n\nreturn [{\n  json: {\n    subject: `Hiring Stall Alert – ${candidates.length} Candidates Need Follow-up`,\n    html,\n    candidate_count: candidates.length\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1456,
+        16
+      ],
+      "id": "aec6f3d8-0b0a-4884-b57c-ecf782d97df2",
+      "name": "email formating"
+    },
+    {
+      "parameters": {
+        "content": "**Stall Alerter – Hiring Pipeline Monitor**\n\nAn automated AI-powered workflow that monitors the hiring pipeline weekly, identifies candidates with no updates for more than 5 days, calculates stalled days, and uses AI to prioritize follow-ups and recommend next actions. It then sends the recruiter a structured email report to help prevent missed candidates and reduce hiring delays.",
+        "height": 320,
+        "width": 2016
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -80,
+        -112
+      ],
+      "typeVersion": 1,
+      "id": "9f59a6a4-db8a-489e-b11a-10130d515d06",
+      "name": "Sticky Note"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "5 days threshold": {
+      "main": [
+        [
+          {
+            "node": "Aggregate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "email formating",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a message": {
+      "main": [
+        []
+      ]
+    },
+    "Schedule Weekly Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get hiring board sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get hiring board sheet": {
+      "main": [
+        [
+          {
+            "node": "Calculate Days Since Last Update",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calculate Days Since Last Update": {
+      "main": [
+        [
+          {
+            "node": "5 days threshold",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "email formating": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": true
+  },
+  "versionId": "99bfa3ba-0b0a-4183-a337-668b80b7a9dd",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "1fc4d77e2d02c330a0dfe0917307f2bd888c9eab135c0f8c8a0d24c1d4c25ea5"
+  },
+  "nodeGroups": [],
+  "id": "TXs35V6ywItsbZ3j",
+  "tags": []
+}
