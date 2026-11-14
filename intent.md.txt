@@ -1,0 +1,51 @@
+# Intent – Hiring Pipeline Stall Alerter
+
+## Problem
+
+Recruitment processes can become delayed when candidates remain in the same hiring stage without updates. This can happen due to human error, missed follow-ups, or simply forgetting to check a candidate's status.
+
+These delays can make the hiring process take longer and cause recruiters to lose track of candidates who need attention.
+
+## Target Users
+
+Recruiters and Talent Acquisition teams responsible for managing candidates throughout the hiring process.
+
+## Goal
+
+The goal of the Stall Alerter is to reduce hiring delays, organize follow-up priorities, and prevent candidates from being overlooked.
+
+It helps recruiters quickly identify which candidates need attention and what action should be taken next.
+
+## Input
+
+The tool reads candidate information from a hiring board stored in Google Sheets, including:
+
+- Candidate name
+- Current hiring stage
+- Last updated date
+
+## How It Works
+
+1. A weekly trigger starts the workflow.
+2. The workflow retrieves candidate records from the hiring board.
+3. It calculates how many days have passed since each candidate's last update.
+4. Candidates with no updates for more than five days are identified.
+5. An AI agent analyzes the stalled candidates, assigns a priority level, explains the reason for follow-up, and recommends the next action.
+6. The results are formatted into a structured email report and sent to the recruiter as a reminder.
+
+## Scope and Limitations
+
+The tool is designed to support recruiters, not replace their decisions.
+
+It does not:
+- Send messages directly to candidates.
+- Change candidates' hiring stages.
+- Make hiring decisions or accept/reject candidates.
+
+All follow-up decisions remain with the recruiter.
+
+## Success Criteria
+
+The tool is successful when recruiters can quickly understand which candidates need follow-up, why they need attention, and what action should be taken next.
+
+The expected outcome is better visibility across the hiring pipeline, more organized follow-ups, and fewer delays caused by missed or forgotten updates.
